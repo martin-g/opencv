@@ -1,0 +1,65 @@
+name: ARM64 Ascend NPU build checks
+
+on:
+  push:
+    branches:
+      - npu_support
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
+jobs:
+  build:
+
+    runs-on: ["self-hosted"]
+
+    steps:
+    - name: Check prerequisites
+      run: |
+        # the OS user must be a member of 'HwHiAiUser' group
+        id | grep HwHiAiUser
+
+    - name: Checkout opencv
+      uses: actions/checkout@v4
+
+    - name: Checkout opencv_contrib
+      uses: actions/checkout@v4
+      with:
+        repository: hipudding/opencv_contrib
+        ref: npu_support
+        path: opencv_contrib
+
+    - name: Configure
+      run: |
+        set -x
+        mkdir build
+        cd build
+        cmake  \
+          -DWITH_DEBUG=1 \
+          -DBUILD_WITH_DEBUG_INFO=1 \
+          -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib/modules \
+          -DWITH_CUDA=0 \
+          -DWITH_CANN=1 \
+          -DPYTHON3_EXECUTABLE=/usr/bin/python3 \
+          -DPYTHON_LIBRARY=/usr/lib64 \
+          -DPYTHON_INCLUDE_DIR=/usr/include/python3.9 \
+          -DBUILD_opencv_wechat_qrcode=OFF \
+          -DBUILD_opencv_xfeatures2d=OFF \
+          -DBUILD_opencv_face=OFF \
+          -DBUILD_opencv_dnn=OFF \
+          -DBUILD_opencv_features2d=OFF \
+          -DWITH_CAROTENE=OFF \
+          -DWITH_IPP=OFF \
+          -DBUILD_DOCS=ON \
+          ..
+
+    - name: Build
+      run: |
+        cd build
+        make -j8
+        file ./bin/opencv_test_cannops | grep aarch64
+
+    - name: Test CANN ops
+      run: |
+        cd build
+        ./bin/opencv_test_cannops
